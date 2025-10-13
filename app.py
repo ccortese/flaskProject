@@ -1,32 +1,38 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session
-from flask_migrate import Migrate
+# =============================================================================
+# IMPORTS AND CONFIGURATION
+# =============================================================================
+
+from flask import Flask, render_template, request, redirect, url_for, session
 from flask_sqlalchemy import SQLAlchemy
 import os
+from dotenv import load_dotenv
+import anthropic
+import tempfile
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
 
-# Configure SQLite database - try different approaches
-basedir = os.path.abspath(os.path.dirname(__file__))
-
-# Try to use a writable directory
-import tempfile
+# Configure SQLite database
 temp_dir = tempfile.gettempdir()
 db_path = os.path.join(temp_dir, "mydatabase.db")
 
 print(f"Attempting to create database at: {db_path}")
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = 'your-secret-key-change-this-in-production'
 
 db = SQLAlchemy(app)
 
-# Define your User model
+# =============================================================================
+# DATABASE MODELS
+# =============================================================================
+
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password = db.Column(db.String(200), nullable=False)
 
-# Define your Task model
 class Task(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
@@ -35,23 +41,23 @@ class Task(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
 
+# =============================================================================
+# AUTHENTICATION ROUTES
+# =============================================================================
 
-#loads the mainpage
 @app.route('/')
 def load_main_page():
+    """Load the main login page"""
     return render_template('login.html')
-#loads the register page when clicked from the login page
+
 @app.route('/register', methods=['GET'])
 def register():
+    """Load the registration page"""
     return render_template('register.html')
 
-
-#def handle_error(message, status_code=400):
-#    return jsonify(error=message), status_code
-
-#this function registers you
 @app.route('/registerUser', methods=['POST'])
 def new_user():
+    """Register a new user"""
     try:
         # Get username and password from form data
         username = request.form.get('username')
@@ -76,9 +82,10 @@ def new_user():
         # Rollback in case of error
         db.session.rollback()
         return f"Registration failed: {str(e)}", 500
-#this function logs you in
+
 @app.route('/login', methods=['POST'])
 def login():
+    """Log in an existing user"""
     try:
         # Get username and password from form data
         username = request.form.get('username')
@@ -107,9 +114,19 @@ def login():
     except Exception as e:
         return f"Login failed: {str(e)}", 500
 
-# Dashboard route to show tasks
+@app.route('/logout')
+def logout():
+    """Log out the current user"""
+    session.clear()
+    return redirect(url_for('load_main_page'))
+
+# =============================================================================
+# TASK MANAGEMENT ROUTES
+# =============================================================================
+
 @app.route('/dashboard')
 def dashboard():
+    """Display the user's task dashboard"""
     if 'user_id' not in session:
         return redirect(url_for('load_main_page'))
 
@@ -120,9 +137,9 @@ def dashboard():
     except Exception as e:
         return f"Error loading dashboard: {str(e)}", 500
 
-# Add task route
 @app.route('/add_task', methods=['POST'])
 def add_task():
+    """Add a new task for the current user"""
     if 'user_id' not in session:
         return redirect(url_for('load_main_page'))
 
@@ -146,9 +163,9 @@ def add_task():
         db.session.rollback()
         return f"Error adding task: {str(e)}", 500
 
-# Delete task route
 @app.route('/delete_task/<int:task_id>', methods=['POST'])
 def delete_task(task_id):
+    """Delete a specific task"""
     if 'user_id' not in session:
         return redirect(url_for('load_main_page'))
 
@@ -165,9 +182,9 @@ def delete_task(task_id):
         db.session.rollback()
         return f"Error deleting task: {str(e)}", 500
 
-# Toggle task completion
 @app.route('/toggle_task/<int:task_id>', methods=['POST'])
 def toggle_task(task_id):
+    """Toggle task completion status"""
     if 'user_id' not in session:
         return redirect(url_for('load_main_page'))
 
@@ -184,23 +201,35 @@ def toggle_task(task_id):
         db.session.rollback()
         return f"Error updating task: {str(e)}", 500
 
-# Logout route
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect(url_for('load_main_page'))
+# =============================================================================
+# CLAUDE AI INTEGRATION ROUTES
+# =============================================================================
 
-# Route to manually initialize database (for debugging)
-@app.route('/init_db')
-def init_db():
-    try:
-        db.create_all()
-        return "Database initialized successfully!"
-    except Exception as e:
-        return f"Error initializing database: {str(e)}"
+@app.route('/send_to_claude', methods=['POST'])
+def send_to_claude():
+    last_task = Task.query.filter_by(user_id=session['user_id']).order_by(Task.created_at.desc()).first()
+    client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
+    task_info = f"Task Title: {last_task.title}"
+    if last_task.description:
+        task_info += f"\nTask Description: {last_task.description}"
+    full_prompt = f"Please analyze this task and provide suggestions for completion, potential challenges, and next steps:\n\n{task_info}"
+    response = client.messages.create(
+        model="claude-3-5-haiku-latest",
+        max_tokens=1000,
+        messages=[{"role": "user", "content": full_prompt}]
+    )
+    claude_response = response.content[0].text
+    tasks = Task.query.filter_by(user_id=session['user_id']).order_by(Task.created_at.desc()).all()
+    return render_template('homepage.html', tasks=tasks, username=session['username'], claude_response=claude_response)
 
-# Initialize database when app starts
+
+
+# =============================================================================
+# DATABASE INITIALIZATION FUNCTIONS
+# =============================================================================
+
 def init_database():
+    """Initialize the database when the app starts"""
     try:
         with app.app_context():
             # Check if we can write to the database location
@@ -212,8 +241,19 @@ def init_database():
                 os.makedirs(db_dir, exist_ok=True)
                 print(f"Created directory: {db_dir}")
 
+            # Create all tables
             db.create_all()
             print("Database tables created successfully!")
+
+            # Verify tables were created
+            try:
+                user_count = User.query.count()
+                task_count = Task.query.count()
+                print(f"Database verification: Users: {user_count}, Tasks: {task_count}")
+            except Exception as verify_error:
+                print(f"Database verification failed: {verify_error}")
+                raise verify_error
+
     except Exception as e:
         print(f"Error creating database: {e}")
         print("Falling back to in-memory database...")
@@ -221,12 +261,18 @@ def init_database():
         with app.app_context():
             db.create_all()
             print("In-memory database created successfully!")
+            # Verify in-memory database
+            try:
+                user_count = User.query.count()
+                task_count = Task.query.count()
+                print(f"In-memory database verification: Users: {user_count}, Tasks: {task_count}")
+            except Exception as verify_error:
+                print(f"In-memory database verification failed: {verify_error}")
+
+# =============================================================================
+# APPLICATION STARTUP
+# =============================================================================
 
 if __name__ == '__main__':
     init_database()
     app.run(debug=True)
-    
-    
-    
-
-

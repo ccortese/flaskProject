@@ -19,7 +19,6 @@
         </div>
 
         <div class="content">
-            <!-- Add New Task Form -->
             <div class="form-container">
                 <h3 class="mb-20">Add New Task</h3>
                 <form action="/add_task" method="POST">
@@ -37,7 +36,15 @@
                 </form>
             </div>
 
-            <!-- Task List -->
+            <div>
+                <form action="/send_to_claude" method="POST">
+                    <button type="submit">Send Last Task to Claude</button>
+                </form>
+                {% if claude_response %}
+                    <div>{{ claude_response }}</div>
+                {% endif %}
+            </div>
+
             <div class="task-list">
                 <h3 class="mb-20">Your Tasks</h3>
 
@@ -84,5 +91,9 @@
             </div>
         </div>
     </div>
+
+
+
+
 </body>
 </html>
