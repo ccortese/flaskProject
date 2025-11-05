@@ -1,0 +1,14 @@
+# Stripe Payment Service Requirements
+
+# Core dependencies
+Flask==2.3.3
+Flask-CORS==4.0.0
+python-dotenv==1.0.0
+
+# Stripe SDK (using local copy from payment-integrations)
+# stripe>=6.0.0  # Uncomment if you want to install via pip instead
+
+# Development dependencies
+pytest==7.4.2
+pytest-flask==1.2.0
+requests==2.31.0
