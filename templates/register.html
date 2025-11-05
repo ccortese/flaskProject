@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Tracker - Register</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Task Tracker</h1>
+            <p>Create your account to start tracking tasks</p>
+        </div>
+
+        <div class="content">
+            <div class="form-container">
+                <h2 class="text-center mb-20">Create New Account</h2>
+
+                <form action="/registerUser" method="POST">
+                    <div class="form-group">
+                        <label for="username">Username:</label>
+                        <input type="text" id="username" name="username" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password">Password:</label>
+                        <input type="password" id="password" name="password" required>
+                    </div>
+
+                    <button type="submit" class="btn">Register</button>
+                </form>
+
+                <div class="text-center mt-20">
+                    <p>Already have an account?</p>
+                    <a href="/" class="btn btn-secondary">Login Here</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,2 @@
+# Requirements for PR Review Agent
+requests>=2.25.0
