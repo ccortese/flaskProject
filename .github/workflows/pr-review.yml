@@ -30,13 +30,6 @@ jobs:
         # Install dependencies from requirements file
         pip install -r requirements-review.txt
 
-    - name: Debug - List directory contents
-      run: |
-        echo "Current directory contents:"
-        ls -la
-        echo "Python files in root:"
-        ls -la *.py || echo "No Python files in root"
-
     - name: Get changed Python files
       id: changed-files
       run: |
