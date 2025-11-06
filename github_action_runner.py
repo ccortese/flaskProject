@@ -104,10 +104,18 @@ def main():
     with open('review_status.txt', 'w') as f:
         f.write(status)
     
-    # Set GitHub Action output
-    print(f"::set-output name=has_violations::{len(all_violations) > 0}")
-    print(f"::set-output name=has_errors::{has_errors}")
-    print(f"::set-output name=violation_count::{len(all_violations)}")
+    # Set GitHub Action output using environment files (new format)
+    github_output = os.environ.get('GITHUB_OUTPUT')
+    if github_output:
+        with open(github_output, 'a') as f:
+            f.write(f"has_violations={str(len(all_violations) > 0).lower()}\n")
+            f.write(f"has_errors={str(has_errors).lower()}\n")
+            f.write(f"violation_count={len(all_violations)}\n")
+    else:
+        # Fallback to deprecated format for local testing
+        print(f"::set-output name=has_violations::{str(len(all_violations) > 0).lower()}")
+        print(f"::set-output name=has_errors::{str(has_errors).lower()}")
+        print(f"::set-output name=violation_count::{len(all_violations)}")
     
     # Print summary
     print(f"\nReview Summary:")
